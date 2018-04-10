@@ -4,7 +4,6 @@
 #include <QTextStream>
 #include <QDebug>
 
-
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow)
@@ -38,97 +37,137 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->plot_ETCO2->addGraph();
     ui->plot_ETCO2->graph(0)->setScatterStyle(QCPScatterStyle::ssDot);
     ui->plot_ETCO2->graph(0)->setLineStyle(QCPGraph::lsLine);
+    ui->plot_ETCO2->yAxis->setRange(0, 40);
 
-    tick = 0;
-    freq = 5;
+    QSharedPointer<QCPAxisTickerTime> timeTicker(new QCPAxisTickerTime);
+    timeTicker->setTimeFormat("%h:%m:%s");
+    ui->plot_depth->xAxis2->setTicker(timeTicker);
+    ui->plot_ETCO2->xAxis->setTicker(timeTicker);
+
+    QTimer *dataTimer = new QTimer(this);
+    connect(dataTimer, SIGNAL(timeout()) , this, SLOT(realtimeDataPlotSlot()));
+    dataTimer->start(0);
+
+    ui->pushButton_stop->setEnabled(false);
 }
 
 MainWindow::~MainWindow()
 {
-
     delete ui;
-    //    delete csvModel;
 }
 
-void MainWindow::addPoint(double x, double y)
+void MainWindow::update_lcd(double x, double y)
 {
-    qv_tick.append(tick/freq);
-    qv_depth.append(x);
-    qv_etco2.append(y);
+    ui->lcdNumber_CPM->display(x);
+    ui->lcdNumber_EtCO2->display(y);
 }
 
-void MainWindow::plot()
+void MainWindow::on_pushButton_start_clicked()
 {
-    if(tick>(freq*5))
-    {
-        // maintaining 5 sec width
-        ui->plot_depth->xAxis2->setRange(((tick/freq)-5),tick/freq);
-        ui->plot_ETCO2->xAxis->setRange(((tick/freq)-5),tick/freq);
+
+    if(start_activation)
+        start();
+
+    else
+        pause();
+
+    if(stop_activation)
+        restart();
+
+    stop_activation = false;
+    start_activation = !start_activation;
+
+//        QFile file("../patientCPRdata.csv");
+//    if(file.open(QFile::Append))
+//    {
+//            QTextStream output(&file);
+//            output << tick << ";" << ui->doubleSpinBox_depth->value() << ";" << ui->doubleSpinBox_ETCO2->value() << ";" << ui->spinBox_position->value() << "\n" ;
+//}
+//            file.close();
+
+//         tick++;
+
+}
+
+void MainWindow::on_pushButton_stop_clicked()
+{
+    if (!stop_activation)
+        stop();
+}
+
+void MainWindow::on_spinBox_position_valueChanged(int position)
+{
+    ui->position_matrix->setPostion(position);
+}
+
+void MainWindow::realtimeDataPlotSlot()
+{
+    static QTime time(QTime::currentTime());
+    double key = time.elapsed()/1000.0;
+    static double lastPointKey = 0;
+    static double progressPointKey = 0;
+    static double elapsedPointKey = 0;
+
+    if (start_activation){
+
+        progressPointKey = key-elapsedPointKey;
+
+        if (progressPointKey-lastPointKey > 0.01) // at most add point every 10 ms
+        {
+        // add data to lines:
+        ui->plot_depth->graph(0)->addData(progressPointKey, 3+2*qSin(progressPointKey*5)+1*qCos(progressPointKey*2));
+        ui->plot_ETCO2->graph(0)->addData(progressPointKey, 20+10*qCos(progressPointKey*3)-2*qSin(progressPointKey*10));
+        update_lcd(120,20+10*qCos(progressPointKey*3)-2*qSin(progressPointKey*10));
+        // rescale value (vertical) axis to fit the current data:
+        //ui->customPlot->graph(0)->rescaleValueAxis();
+        ui->plot_ETCO2->graph(0)->rescaleValueAxis(true);
+        lastPointKey = progressPointKey;
+        }
+        // make key axis range scroll with the data (at a constant range size of 5):
+        ui->plot_depth->xAxis2->setRange(progressPointKey, 5, Qt::AlignRight);
+        ui->plot_ETCO2->xAxis->setRange(progressPointKey, 5, Qt::AlignRight);
+        ui->plot_depth->replot();
+        ui->plot_ETCO2->replot();
     }
 
-    ui->plot_depth->graph(0)->setData(qv_tick, qv_depth);
-    ui->plot_ETCO2->graph(0)->setData(qv_tick, qv_etco2);
+    else if (!start_activation && !stop_activation){
+        elapsedPointKey = key - progressPointKey;
+    }
+
+    if (stop_activation)
+    {
+        elapsedPointKey = key;
+        lastPointKey = 0;
+    }
+}
+
+void MainWindow::start()
+{
+    ui->pushButton_start->setText(tr("Start"));
+}
+
+void MainWindow::pause()
+{
+    ui->pushButton_start->setText(tr("Pause"));
+    ui->pushButton_stop->setEnabled(true);
+}
+
+void MainWindow::stop()
+{
+    ui->pushButton_start->setText(tr("Start"));
+    ui->pushButton_stop->setEnabled(false);
+    start_activation = false;
+    stop_activation = true;
+}
+
+void MainWindow::restart()
+{
+    tick = 0;
+    ui->plot_depth->graph(0)->data().data()->clear();
+    ui->plot_ETCO2->graph(0)->data().data()->clear();
     ui->plot_depth->replot();
     ui->plot_ETCO2->replot();
     ui->plot_depth->update();
     ui->plot_ETCO2->update();
 }
 
-void MainWindow::update_lcd(double x, double y, int z)
-{
-    ui->lcdNumber_CPM->display(x);
-    ui->lcdNumber_EtCO2->display(y);
-
-     ui->position_matrix->setPostion(z);
-    //ui->lcdNumber_position->display(z);
-}
-
-void MainWindow::on_pushButton_add_clicked()
-{
-    addPoint(ui->doubleSpinBox_depth->value(), ui->doubleSpinBox_ETCO2->value());
-    update_lcd(ui->doubleSpinBox_depth->value(), ui->doubleSpinBox_ETCO2->value(),ui->spinBox_position->value());
-    plot();
-
-        QFile file("../patientCPRdata.csv");
-    if(file.open(QFile::Append))
-    {
-            QTextStream output(&file);
-            output << tick << ";" << ui->doubleSpinBox_depth->value() << ";" << ui->doubleSpinBox_ETCO2->value() << ";" << ui->spinBox_position->value() << "\n" ;
-}
-            file.close();
-
-         tick++;
-
-}
-
-//============loading csv text================================
-//    csvModel = new QStandardItemModel(this);
-//    csvModel->setColumnCount(2);
-
-//    csvModel->setHorizontalHeaderLabels(QStringList() << "Time" << "Position");
-//    ui->tableView->setModel(csvModel);
-
-//    QFile file("../data.csv");
-//    if ( !file.open(QFile::ReadOnly | QFile::Text)){
-//        qDebug() << "File not exists";
-//    }
-//    else {
-//            // Create a thread to retrieve data from a file
-//            QTextStream in(&file);
-//            //Reads the data up to the end of file
-//            while (!in.atEnd())
-//            {
-//                QString line = in.readLine();
-//                // Adding to the model in line with the elements
-//                QList<QStandardItem *> standardItemsList;
-//                QStringList data_list = line.split(";");
-//                for (int i=0; i<data_list.size();i++)
-//                {
-//                  standardItemsList.append(new QStandardItem(data_list[i]));
-//                }
-////                QString tmp = data_list[2];
-////                float tmpf = tmp.toFloat();
-//                 csvModel->insertRow(csvModel->rowCount(), standardItemsList);
-//            }
-//            file.close();
-//    }

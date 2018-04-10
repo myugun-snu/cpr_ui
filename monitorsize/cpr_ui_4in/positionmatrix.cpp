@@ -1,7 +1,7 @@
 #include <QTimer>
 #include <QFont>
 #include <QPainter>
-#include <QDebug>
+//#include <QDebug>
 #include <QRect>
 
 #include "positionmatrix.h"
@@ -172,7 +172,7 @@ void PositionMatrix::paintEvent(QPaintEvent *)
         break;
 
     default:
-        qDebug() << "Nope";
+        //qDebug() << "Nope";
         break;
     }
 

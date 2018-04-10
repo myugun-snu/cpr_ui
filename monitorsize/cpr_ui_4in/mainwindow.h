@@ -17,24 +17,32 @@ public:
     explicit MainWindow(QWidget *parent = 0);
     ~MainWindow();
 
-    void addPoint(double x, double y);
-    void plot();
-    void update_lcd(double x, double y, int z);
+    void update_lcd(double x, double y);
 
-    double tick;
+    double tick = 0;
 
-    //freqeuncy of sensor (recieving data(EtCO2, Position etc.))
-    double freq;
 
 private slots:
 
     //button for testing
-    void on_pushButton_add_clicked();
+    void on_pushButton_start_clicked();
+    void on_pushButton_stop_clicked();
+    void on_spinBox_position_valueChanged(int position);
+    void realtimeDataPlotSlot();
+    void start();
+    void pause();
+    void stop();
+    void restart();
 
 private:
     Ui::MainWindow *ui;
 
-    QVector<double> qv_tick, qv_depth, qv_etco2;
+    //freqeuncy of sensor (recieving data(EtCO2, Position etc.))
+    double freq = 2;
+    double plot_time = 5;
+    bool start_activation = false;
+    bool stop_activation = true;
+
     QPen ref_line_pen;
 
 //    // to use QStandardItemModel Class

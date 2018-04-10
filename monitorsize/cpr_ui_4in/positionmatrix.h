@@ -1,4 +1,4 @@
-#ifndef POSITIONMATRIX_H
+ #ifndef POSITIONMATRIX_H
 #define POSITIONMATRIX_H
 
 #include <QWidget>
